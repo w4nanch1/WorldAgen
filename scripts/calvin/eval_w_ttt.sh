@@ -38,28 +38,6 @@ base_checkpoint_dir="checkpoints/$experiment_name"
 node=1
 node_num=1
 
-echo "========================================="
-echo "Configuration:"
-echo "Experiment name: $experiment_name"
-echo "Window size: $window_size"
-echo "Image sequence length: $image_sequence_length"
-echo "State sequence length: $state_sequence_length"
-echo "Action sequence length: $action_sequence_length"
-echo "Sequence length: $sequence_length"
-echo "Checkpoint directory: $base_checkpoint_dir"
-echo "lora_mode: $lora_mode"
-echo "lora_rank: $lora_rank" 
-echo "lora_alpha: $lora_alpha"
-echo "lora_dropout: $lora_dropout"
-echo "ttt_num_samples: $ttt_num_samples"
-echo "ttt_traj_len: $ttt_traj_len"
-echo "ttt_sample_repeat: $ttt_sample_repeat"
-echo "ttt_batch_size: $ttt_batch_size"
-echo "ttt_num_epoch: $ttt_num_epoch"
-echo "ttt_learning_rate: $ttt_learning_rate"
-echo "ttt_weight_decay: $ttt_weight_decay"
-echo "========================================="
-
 for ckpt_name in "${ckpt_names[@]}"; do
     resume_from_checkpoint="${base_checkpoint_dir}/${ckpt_name}.pth"
     

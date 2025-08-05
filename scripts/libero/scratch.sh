@@ -1,11 +1,11 @@
 #!/bin/bash
 export CUDA_HOME="/usr/local/cuda"
-save_dir="./checkpoints/"
-root_dir="./datasets"
+save_dir="./YOUR_CHECKPOINT_SAVE_DIR/"
+root_dir="./YOUR_DATASET_DIR/"
 vit_checkpoint_path="./checkpoints/mae_pretrain_vit_base.pth"
-libero_path="./datasets/libero_90"
+libero_path="./YOUR_DATASET_DIR/libero_90"
 
-calvin_dataset_path="calvin/dataset/task_ABC_D"
+calvin_dataset_path="YOUR_CALVIN_DATASET_DIR/"
 node=1
 node_num=4
 torchrun --nnodes=${node} --nproc_per_node=${node_num} --master_port=10711 train_libero.py \

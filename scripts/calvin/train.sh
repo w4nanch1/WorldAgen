@@ -1,10 +1,8 @@
 #!/bin/bash
-### NEED TO CHANGE ###
 calvin_dataset_path="calvin/dataset/task_ABC_D"
-# calvin_dataset_path="LIBERO/libero/datasets/task_ABC_D"
 save_checkpoint_path="checkpoints/"
-vit_checkpoint_path="checkpoints/vit_mae/mae_pretrain_vit_base.pth" # downloaded from https://drive.google.com/file/d/1bSsvRI4mDM3Gg51C6xO0l9CbojYw3OEt/view?usp=sharing
-# resume_from_checkpoint="checkpoints/scratch_uniaorld_mlp_wo_loss_state_calvin_abc_d/17.pth"
+vit_checkpoint_path="checkpoints/vit_mae/mae_pretrain_vit_base.pth"
+
 node=1
 node_num=1
 torchrun --nnodes=${node} --nproc_per_node=${node_num} --master_port=10211 train_calvin.py \
@@ -24,7 +22,7 @@ torchrun --nnodes=${node} --nproc_per_node=${node_num} --master_port=10211 train
     --precision fp32 \
     --learning_rate 1e-3 \
     --finetune_type "calvin" \
-    --wandb_project seer \
+    --wandb_project YOUR_WANDB_PROJECT_NAME \
     --weight_decay 1e-4 \
     --num_resampler_query 6 \
     --run_name test \
@@ -46,9 +44,5 @@ torchrun --nnodes=${node} --nproc_per_node=${node_num} --master_port=10211 train
     --state_sequence_length 1 \
     --action_sequence_length 3 \
     --warmup_epochs 5 \
-    # --resume_from_checkpoint ${resume_from_checkpoint} \
-    # --report_to_wandb \
-    # --loss_state \
-    # --pred_state \
-    # --pred_image \
+    --report_to_wandb \
     

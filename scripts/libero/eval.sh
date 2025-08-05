@@ -5,12 +5,12 @@ export EGL_PLATFORM="surfaceless"
 export LIBGL_ALWAYS_SOFTWARE="1"
 pthlist=("38")
 for ckpt_id in "${pthlist[@]}"; do
-    resume_from_checkpoint="/workspace/root/uniaorld/scripts/LIBERO_LONG/Seer/checkpoints/libero_scratch_seq7_len_1img_3act"
-    vit_checkpoint_path="/workspace/root/uniaorld/checkpoints/mae_pretrain_vit_base.pth"
+    resume_from_checkpoint="./YOUR_CHECKPOINT_DIR/"
+    vit_checkpoint_path="./checkpoints/mae_pretrain_vit_base.pth"
     this_resume_from_checkpoint="${resume_from_checkpoint}/${ckpt_id}.pth"
-    save_checkpoint_path="/workspace/root/uniaorld/scripts/LIBERO_LONG/Seer/checkpoints/libero_scratch_seq10_len/libero_scratch"
+    save_checkpoint_path="./YOUR_CHECKPOINT_SAVE_DIR/"
     dirname=$(basename "$resume_from_checkpoint")
-    LOG_DIR="/workspace/root/uniaorld/scripts/LIBERO_LONG/Seer/log/${dirname}"
+    LOG_DIR="./YOUR_LOG_DIR/"
     mkdir -p ${LOG_DIR}
     test_id="${ckpt_id}_ori"
     logfile="${LOG_DIR}/${test_id}.log"
@@ -54,6 +54,5 @@ for ckpt_id in "${pthlist[@]}"; do
         --pred_image \
         --gripper_width \
         --eval_libero_ensembling \
-        --eval_action_entropy \
         --resume_from_checkpoint ${this_resume_from_checkpoint} | tee ${logfile}
 done

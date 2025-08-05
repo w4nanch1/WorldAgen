@@ -1,14 +1,14 @@
 #!/bin/bash
 
-win=16        # window size
-img=1           # image sequence length
+win=16        # trajectory length
+img=1         # image sequence length
 act=5         # action sequence length
 
 ckpt_names=(
     "16"
 )
 
-calvin_dataset_path="/home/chiwan/project/UniAorld/calvin/dataset/task_ABC_D"
+calvin_dataset_path="calvin/dataset/task_ABC_D"
 calvin_conf_path="calvin/calvin_models/conf"
 vit_checkpoint_path="checkpoints/vit_mae/mae_pretrain_vit_base.pth"
 save_checkpoint_path="checkpoints/"
@@ -24,17 +24,6 @@ base_checkpoint_dir="checkpoints/$experiment_name"
 
 node=1
 node_num=1
-
-echo "========================================="
-echo "Configuration:"
-echo "Experiment name: $experiment_name"
-echo "Window size: $window_size"
-echo "Image sequence length: $image_sequence_length"
-echo "State sequence length: $state_sequence_length"
-echo "Action sequence length: $action_sequence_length"
-echo "Sequence length: $sequence_length"
-echo "Checkpoint directory: $base_checkpoint_dir"
-echo "========================================="
 
 for ckpt_name in "${ckpt_names[@]}"; do
     resume_from_checkpoint="${base_checkpoint_dir}/${ckpt_name}.pth"
@@ -80,9 +69,6 @@ for ckpt_name in "${ckpt_names[@]}"; do
         --action_sequence_length ${action_sequence_length} \
         --test_ori \
         --use_qwen \
-        --eval_action_entropy \
         --resume_from_checkpoint ${resume_from_checkpoint} | tee ${log_file} \
-    # --pred_image \
-    # --eval_action_entropy \
 done
     
