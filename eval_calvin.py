@@ -55,7 +55,6 @@ def main():
         atten_goal=args.atten_goal,
         use_qwen=args.use_qwen,
         action_pred_steps=args.action_pred_steps,
-        eval_action_entropy=args.eval_action_entropy,
     )
     random_seed(args.seed, args.rank)
     print(f"Start running evaluation on rank {args.rank}.")

@@ -280,8 +280,6 @@ def get_parser(is_eval=False):
     parser.add_argument("--ttt_max_grad_norm", type=float, default=0.1)
     parser.add_argument("--use_sampled_data", default=False, action="store_true")
     parser.add_argument("--ttt_data_dir", type=str, default="./data_for_one_traj/")
-    parser.add_argument("--eval_action_entropy", default=False, action="store_true")
-    
     # lora
     parser.add_argument("--lora_mode", type=str, default="lora")
     parser.add_argument("--lora_rank", type=int, default=4)

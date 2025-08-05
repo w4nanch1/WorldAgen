@@ -92,15 +92,9 @@ class RandomSampler():
         for i in range(self.args.ttt_traj_len):
             if i == 0:
                 first_action = torch.zeros(1, self.args.action_sequence_length, 7)
-                if self.args.eval_action_entropy:
-                    action_pred, _ = self.wrapped_model.step_agent(text, state, image_primary, image_wrist, action=first_action)
-                else:
-                    action_pred = self.wrapped_model.step_agent(text, state, image_primary, image_wrist, action=first_action) # [B, action_seq, 7]
+                action_pred = self.wrapped_model.step_agent(text, state, image_primary, image_wrist, action=first_action) # [B, action_seq, 7]
             else:
-                if self.args.eval_action_entropy:
-                    action_pred, _ = self.wrapped_model.step_agent(text, state, image_primary, image_wrist)
-                else:
-                    action_pred = self.wrapped_model.step_agent(text, state, image_primary, image_wrist)
+                action_pred = self.wrapped_model.step_agent(text, state, image_primary, image_wrist)
             _, _, _ = self.wrapped_model.step_world_model(action_pred)
             # action_pred = self.add_noise_to_action(action_pred) # TODO
             sub_actions.append(action_pred)

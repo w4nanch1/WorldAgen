@@ -157,7 +157,6 @@ class UniAorld(nn.Module):
         pred_image=True,
         atten_goal=0,
         use_qwen=False,
-        eval_action_entropy=False,
     ):
         super().__init__()
         self.device = clip_device
@@ -176,7 +175,6 @@ class UniAorld(nn.Module):
         self.pred_state = pred_state
         self.action_pred_steps = action_pred_steps
         self.atten_goal = atten_goal
-        self.eval_action_entropy = eval_action_entropy
 
         # text projector
         self.text_projector = nn.Linear(512, self.hidden_dim)        
@@ -248,151 +246,110 @@ class UniAorld(nn.Module):
         MLP_hidden_dim = self.hidden_dim // 2
         self.action_decoder = nn.Sequential(
             nn.Linear(self.hidden_dim, MLP_hidden_dim),
-            nn.ReLU(),
+            nn.GELU(),
             nn.Linear(MLP_hidden_dim, MLP_hidden_dim),
-            nn.ReLU(),
+            nn.GELU(),
+            nn.Linear(MLP_hidden_dim, self.hidden_dim),
         )
-        self.arm_action_decoder = nn.Sequential(
-            nn.Linear(MLP_hidden_dim, 6),
-            torch.nn.Tanh(),
-        )
-        self.gripper_action_decoder = nn.Sequential(
-            nn.Linear(MLP_hidden_dim, 1),
-            torch.nn.Sigmoid(),
-        )
+        self.arm_action_decoder = nn.Linear(self.hidden_dim, 6)
+        self.gripper_action_decoder = nn.Linear(self.hidden_dim, 1)
 
         # state decoder
-        self.state_decoder = nn.Sequential(
-            nn.Linear(self.hidden_dim, MLP_hidden_dim),
-            nn.ReLU(),
-            nn.Linear(MLP_hidden_dim, MLP_hidden_dim),
-            nn.ReLU(),
-        )
-        self.arm_state_decoder = nn.Sequential(
-            nn.Linear(MLP_hidden_dim, 6),
-            torch.nn.Tanh(),
-        )
-        self.gripper_state_decoder = nn.Sequential(
-            nn.Linear(MLP_hidden_dim, 1),
-            torch.nn.Sigmoid(),
-        )
-
-        self.IMAGE_DECODER_hidden_dim = self.hidden_dim
-        self.NUM_MASK_TOKEN = int(calvin_input_image_size**2 / patch_size / patch_size)  # i.e. num_patch
-        self.PATCH_SIZE = patch_size
-        self.mask_token = nn.Parameter(torch.zeros(1, 1, self.IMAGE_DECODER_hidden_dim))
-        self.image_decoder_obs_pred_projector = nn.Linear(self.hidden_dim, self.IMAGE_DECODER_hidden_dim)
-        self.image_decoder_position_embedding = nn.Parameter(torch.zeros(1, self.NUM_OBS_TOKEN_PER_IMAGE + self.NUM_MASK_TOKEN, self.IMAGE_DECODER_hidden_dim), requires_grad=False)  # fixed sin-cos embedding #   cls_token is alse passed to the decoder in mae
-        self.image_decoder = nn.Sequential(
-            Block(self.IMAGE_DECODER_hidden_dim, num_heads=16, mlp_ratio=4, qkv_bias=True, norm_layer=nn.LayerNorm),
-            Block(self.IMAGE_DECODER_hidden_dim, num_heads=16, mlp_ratio=4, qkv_bias=True, norm_layer=nn.LayerNorm),
+        if self.pred_state:
+            self.state_decoder = nn.Sequential(
+                nn.Linear(self.hidden_dim, MLP_hidden_dim),
+                nn.GELU(),
+                nn.Linear(MLP_hidden_dim, MLP_hidden_dim),
+                nn.GELU(),
+                nn.Linear(MLP_hidden_dim, self.hidden_dim),
             )
-        self.image_decoder_norm = nn.LayerNorm(self.IMAGE_DECODER_hidden_dim)
-        self.image_decoder_pred = nn.Linear(self.IMAGE_DECODER_hidden_dim, self.PATCH_SIZE**2 * 3)
+            self.arm_state_decoder = nn.Linear(self.hidden_dim, 6)
+            self.gripper_state_decoder = nn.Linear(self.hidden_dim, 1)
+
+        # image decoder
+        if self.pred_image:
+            self.IMAGE_DECODER_hidden_dim = 512
+            self.NUM_MASK_TOKEN = 196
+            self.image_decoder_obs_pred_projector = nn.Linear(self.hidden_dim, self.IMAGE_DECODER_hidden_dim)
+            self.mask_token = nn.Parameter(torch.zeros(1, self.NUM_MASK_TOKEN, self.IMAGE_DECODER_hidden_dim))
+            self.image_decoder_position_embedding = nn.Parameter(torch.zeros(1, self.NUM_OBS_TOKEN_PER_IMAGE + self.NUM_MASK_TOKEN, self.IMAGE_DECODER_hidden_dim))
+            self.image_decoder = nn.TransformerEncoder(
+                nn.TransformerEncoderLayer(
+                    d_model=self.IMAGE_DECODER_hidden_dim,
+                    nhead=8,
+                    dim_feedforward=2048,
+                    dropout=0.1,
+                    activation='gelu',
+                    batch_first=True,
+                ),
+                num_layers=6,
+            )
+            self.image_decoder_norm = nn.LayerNorm(self.IMAGE_DECODER_hidden_dim)
+            self.image_decoder_pred = nn.Linear(self.IMAGE_DECODER_hidden_dim, 16 * 16 * 3)
 
         self.initialize_weights()
-
-        vit_checkpoint = torch.load(self.vit_checkpoint_path, map_location='cpu')
-        msg = self.vision_encoder.load_state_dict(vit_checkpoint['model'], strict=False)
-
-        if os.path.exists("checkpoints/clip/ViT-B-32.pt"):
-            self.clip_model, self.image_processor = clip.load("checkpoints/clip/ViT-B-32.pt", device=clip_device)
-        else:
-            self.clip_model, self.image_processor = clip.load("ViT-B/32", device=clip_device)
-        
-        this_num_obs_token = self.NUM_OBS_TOKEN
-        if self.pred_image:
-            pred_this_num_obs_token = this_num_obs_token
-        else:
-            pred_this_num_obs_token = 0
-        num_chunk = sequence_length
-        
-        if self.pred_state:
-            num_B = pred_this_num_obs_token*self.image_sequence_length+self.action_sequence_length*self.action_pred_steps+self.state_sequence_length
-        else:
-            num_B = pred_this_num_obs_token*self.image_sequence_length+self.action_sequence_length*self.action_pred_steps
-
-        num_A = 1+1*self.state_sequence_length+self.action_sequence_length*1+self.image_sequence_length*self.NUM_RESAMPLER_QUERY*2+1*2*self.image_sequence_length 
-        self.register_buffer("attention_mask", generate_attention_mask(
-                K=num_chunk, 
-                num_A=num_A, 
-                num_B=num_B,
-                mask_l_obs_ratio=self.mask_l_obs_ratio,
-                num_obs_token=this_num_obs_token,
-                resampler_query=self.NUM_RESAMPLER_QUERY,
-                image_seq_len=self.image_sequence_length,
-                action_seq_len=self.action_sequence_length,
-                state_seq_len=self.state_sequence_length,
-                action_pred_steps=self.action_pred_steps,
-                pred_state=self.pred_state,
-                pred_obs_token=pred_this_num_obs_token,
-                atten_goal=self.atten_goal
-            ).to(self.device))
+        self._init_model_type()
 
     def initialize_weights(self):
-        image_decoder_position_embedding_obs = get_2d_sincos_pos_embed(self.IMAGE_DECODER_hidden_dim, int(self.NUM_OBS_TOKEN_PER_IMAGE**.5), cls_token=False)
-        image_decoder_position_embedding_mask = get_2d_sincos_pos_embed(self.IMAGE_DECODER_hidden_dim, int(self.NUM_MASK_TOKEN**.5), cls_token=False)
-        image_decoder_position_embedding = np.concatenate((image_decoder_position_embedding_obs, image_decoder_position_embedding_mask), axis=0)
-        self.image_decoder_position_embedding.data.copy_(torch.from_numpy(image_decoder_position_embedding).float().unsqueeze(0))
-        torch.nn.init.normal_(self.mask_token, std=.02)
-        torch.nn.init.normal_(self.transformer_backbone_position_embedding, std=.02)
-        self.apply(self._init_weights)
+        for m in self.modules():
+            if isinstance(m, nn.Linear):
+                self._init_weights(m)
 
     def _init_weights(self, m):
         if isinstance(m, nn.Linear):
-            # we use xavier_uniform following official JAX ViT:
-            torch.nn.init.xavier_uniform_(m.weight)
+            nn.init.trunc_normal_(m.weight, std=.02)
             if isinstance(m, nn.Linear) and m.bias is not None:
                 nn.init.constant_(m.bias, 0)
-        elif isinstance(m, nn.LayerNorm):
-            nn.init.constant_(m.bias, 0)
-            nn.init.constant_(m.weight, 1.0)
 
     def _init_model_type(self):
-        self.vision_encoder_type = next(self.vision_encoder.parameters()).type()
-        self.perceiver_resampler_type = next(self.perceiver_resampler.parameters()).type()
-        self.transformer_backbone_type = next(self.transformer_backbone.parameters()).type()
-        self.action_decoder_type = next(self.action_decoder.parameters()).type()
+        self.vision_encoder_type = next(self.vision_encoder.parameters()).dtype
+        self.perceiver_resampler_type = next(self.perceiver_resampler.parameters()).dtype
+        self.transformer_backbone_type = next(self.transformer_backbone.parameters()).dtype
 
     def forward(self, image_primary, image_wrist, state, text_token, action):
-        B, S_STATE, _ = state.shape
-        B, S_ACTION, _ = action.shape
-        B, S_IMAGE, _, _, _ = image_primary.shape
-        B, S_TEXT, _, = text_token.shape
-        num_chunk = S_IMAGE // self.image_sequence_length
+        B, S_IMAGE, S_STATE, S_ACTION = image_primary.shape[0], self.image_sequence_length, self.state_sequence_length, self.action_sequence_length
+        num_chunk = self.sequence_length
+        S_IMAGE = S_IMAGE * num_chunk
+        S_STATE = S_STATE * num_chunk
+        S_ACTION = S_ACTION * num_chunk
 
-        device = image_primary.device
-        image_pred = None
-        arm_pred_action, gripper_pred_action = None, None 
-        arm_pred_state, gripper_pred_state = None, None
+        # attention mask
+        self.attention_mask = generate_attention_mask(
+            K=1, num_A=1+S_STATE+S_ACTION+self.NUM_RESAMPLER_QUERY*2*S_IMAGE+1*2*S_IMAGE, 
+            num_B=self.NUM_OBS_TOKEN*S_IMAGE + S_STATE*(self.pred_state) + S_ACTION*self.action_pred_steps,
+            mask_l_obs_ratio=self.mask_l_obs_ratio, num_obs_token=self.NUM_OBS_TOKEN, 
+            resampler_query=self.NUM_RESAMPLER_QUERY, image_seq_len=S_IMAGE, action_seq_len=S_ACTION, 
+            state_seq_len=S_STATE, action_pred_steps=self.action_pred_steps, pred_obs_token=self.pred_image, 
+            atten_goal=self.atten_goal, pred_state=self.pred_state
+        )
 
-        # action
-        action = action.flatten(0, 1)
-        arm_action_feature = self.action_pose_encoder(action[:, :6])
-        if not self.gripper_width:
-            gripper_action_one_hot = torch.nn.functional.one_hot(torch.where(action[:, 6:].flatten() < 1, torch.tensor(0).to(device), torch.tensor(1).to(device)), num_classes=2)
+        # text feature
+        text_embedding = self.text_projector(text_token)
+        text_embedding = text_embedding.view(B, num_chunk, -1, self.hidden_dim)
+
+        # action feature
+        if action.type() != self.transformer_backbone_type:
+            action = action.type(self.transformer_backbone_type)
+        arm_action_feature = self.action_pose_encoder(action[:, :, :, :6])
+        if self.gripper_width:
+            gripper_action_one_hot = F.one_hot(action[:, :, :, 6:].long(), num_classes=2).float()
             gripper_action_feature = self.action_gripper_position_encoder(gripper_action_one_hot.type_as(action))
         else:
-            gripper_action_feature = self.action_gripper_position_encoder(action[:, 6:])
-        action_embedding = self.action_projector(torch.cat((arm_action_feature, gripper_action_feature), dim=1))
+            gripper_action_feature = self.action_gripper_position_encoder(action[:, :, :, 6:])
+        action_embedding = self.action_projector(torch.cat((arm_action_feature, gripper_action_feature), dim=3))
         action_embedding = action_embedding.view(B, num_chunk, -1, self.hidden_dim)
-        # text embedding
-        with torch.no_grad():
-            text_feature = self.clip_model.encode_text(text_token.flatten(0, 1))
-            text_feature = text_feature.type(state.type())
-        text_embedding = self.text_projector(text_feature)
-        text_embedding = text_embedding.view(B, num_chunk, -1, self.hidden_dim) 
 
-        # state embedding
-        state = state.flatten(0, 1)
-        arm_state_feature = self.arm_state_encoder(state[:, :6])
-        if not self.gripper_width:
-            gripper_state_one_hot = torch.nn.functional.one_hot(torch.where(state[:, 6:].flatten() < 1, torch.tensor(0).to(device), torch.tensor(1).to(device)), num_classes=2)
+        # state feature
+        if state.type() != self.transformer_backbone_type:
+            state = state.type(self.transformer_backbone_type)
+        arm_state_feature = self.arm_state_encoder(state[:, :, :, :6])
+        if self.gripper_width:
+            gripper_state_one_hot = F.one_hot(state[:, :, :, 6:].long(), num_classes=2).float()
             gripper_state_feature = self.gripper_state_encoder(gripper_state_one_hot.type_as(state))
         else:
-            gripper_state_feature = self.gripper_state_encoder(state[:, 6:])
+            gripper_state_feature = self.gripper_state_encoder(state[:, :, :, 6:])
         
-        state_embedding = self.state_projector(torch.cat((arm_state_feature, gripper_state_feature), dim=1))
+        state_embedding = self.state_projector(torch.cat((arm_state_feature, gripper_state_feature), dim=3))
         state_embedding = state_embedding.view(B, num_chunk, -1, self.hidden_dim) 
 
         # image feature 
@@ -414,7 +371,7 @@ class UniAorld(nn.Module):
         image_wrist_feature = image_wrist_feature[:, :, 1:, :]
 
         # perceiver resampler
-        image_primary_feature = self.perceiver_resampler(image_primary_feature.reshape(B*S_IMAGE, 196, self.RESAMPLER_hidden_dim).unsqueeze(1).unsqueeze(1))  # mae vit outputs 196 tokens
+        image_primary_feature = self.perceiver_resampler(image_primary_feature.reshape(B*S_IMAGE, 196, self.RESAMPLER_hidden_dim).unsqueeze(1).unsqueeze(1))
         image_wrist_feature = self.perceiver_resampler(image_wrist_feature.reshape(B*S_IMAGE, 196, self.RESAMPLER_hidden_dim).unsqueeze(1).unsqueeze(1))
         image_primary_embedding = self.image_primary_projector(image_primary_feature.flatten(0, 2)).view(B, S_IMAGE, -1, self.hidden_dim)
         image_wrist_embedding = self.image_wrist_projector(image_wrist_feature.flatten(0, 2)).view(B, S_IMAGE, -1, self.hidden_dim)
@@ -475,15 +432,9 @@ class UniAorld(nn.Module):
         else:
             action_pred_feature = transformer_output[:, :, pred_token_start_idx+this_num_obs_token*self.image_sequence_length
                                                  :pred_token_start_idx+this_num_obs_token*self.image_sequence_length+self.action_sequence_length*self.action_pred_steps, :]
-        if self.eval_action_entropy:
-            from models.utils import compute_action_token_entropy
-            action_entropy, mean_action_entropy = compute_action_token_entropy(action_pred_feature)
         action_pred_feature = self.action_decoder(action_pred_feature)
         arm_pred_action = self.arm_action_decoder(action_pred_feature)
         gripper_pred_action = self.gripper_action_decoder(action_pred_feature)
         
-        if self.eval_action_entropy:
-            return arm_pred_action, gripper_pred_action, image_pred, arm_pred_state, gripper_pred_state, mean_action_entropy
-        else:
-            return arm_pred_action, gripper_pred_action, image_pred, arm_pred_state, gripper_pred_state
+        return arm_pred_action, gripper_pred_action, image_pred, arm_pred_state, gripper_pred_state
     
