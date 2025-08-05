@@ -227,7 +227,7 @@ def get_parser(is_eval=False):
     # pretrain, finetune, evaluate
     parser.add_argument('--phase', required=True, help='pretrain, finetune, evaluate')
     # libero 
-    parser.add_argument("--libero_path", default="/ailab/user/tianyang/Code/LIBERO")
+    parser.add_argument("--libero_path", default="LIBERO")
     parser.add_argument("--libero_img_size", default=128, type=int)
     parser.add_argument("--libero_eval_max_steps", default=600, type=int)
     parser.add_argument("--gripper_width", default=False, action="store_true")
@@ -252,7 +252,7 @@ def get_parser(is_eval=False):
     parser.add_argument(
         "--calvin_dataset",
         type=str,
-        default='/mnt/petrelfs/share_data/robomani/calvin_data/task_ABCD_D',
+        default='/calvin_data/task_ABC_D',
         help="path to calvin_dataset",
     )
     parser.add_argument("--calvin_conf_path", type=str, help="path to droid configuration file")
@@ -266,7 +266,7 @@ def get_parser(is_eval=False):
     parser.add_argument("--ttt_use_all_data", default=False, action="store_true")
     parser.add_argument("--ttt_train_every_test_sample", default=False, action="store_true")
 
-    parser.add_argument("--ttt_load_model_path", type=str, default="./checkpoints/lora/128lora_rank_16lora_alpha_34samples_4repeat.pth")
+    parser.add_argument("--ttt_load_model_path", type=str, default="./checkpoints/lora/YOUR_MODEL.pth")
     parser.add_argument("--test_interval", type=int, default=1)
     
     parser.add_argument("--ttt_seed", type=int, default=42)
@@ -279,7 +279,8 @@ def get_parser(is_eval=False):
     parser.add_argument("--ttt_weight_decay", type=float, default=0.01)
     parser.add_argument("--ttt_max_grad_norm", type=float, default=0.1)
     parser.add_argument("--use_sampled_data", default=False, action="store_true")
-    parser.add_argument("--ttt_data_dir", type=str, default="./data_for_one_traj/")
+    parser.add_argument("--ttt_data_dir", type=str, default="./TTT_DATA_DIR/")
+    
     # lora
     parser.add_argument("--lora_mode", type=str, default="lora")
     parser.add_argument("--lora_rank", type=int, default=4)
@@ -311,12 +312,3 @@ def get_parser(is_eval=False):
     args = parser.parse_args()
 
     return parser
-
-    # if args.dataloading_type == "seer":
-    #     if args.phase == "pretrain":
-    #         if args.finetune_type == "calvin":
-    #             args.window_size = args.sequence_length + args.future_steps 
-    #         else:
-    #             args.window_size = args.sequence_length
-    #     elif args.phase == "finetune":
-    #         args.window_size = args.sequence_length + args.future_steps
