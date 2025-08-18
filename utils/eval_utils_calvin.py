@@ -18,6 +18,7 @@ import torch.nn.functional as F
 import imageio
 from PIL import Image
 from tqdm.auto import tqdm
+import copy
 from calvin_env.envs.play_table_env import get_env
 from utils.calvin_data_utils import preprocess_image, preprocess_text_calvin
 import functools
