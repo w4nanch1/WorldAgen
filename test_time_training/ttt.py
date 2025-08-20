@@ -354,22 +354,13 @@ class TestTimeTrainer(nn.Module):
                 label_actions = input_actions
                 
                 with autocast():  # image_primary, image_wrist, state, language_instruction
-                    if self.args.eval_action_entropy:
-                        _, _, image_pred, arm_pred_state, gripper_pred_state, _ = self.init_model(
-                            image_primary=input_image_primary,
-                            image_wrist=input_image_wrist,
-                            state=input_states,
-                            text_token=input_texts,
-                            action=input_actions,
-                        )
-                    else:
-                        _, _, image_pred, arm_pred_state, gripper_pred_state = self.init_model(
-                            image_primary=input_image_primary,
-                            image_wrist=input_image_wrist,
-                            state=input_states,
-                            text_token=input_texts,
-                            action=input_actions,
-                        )
+                    _, _, image_pred, arm_pred_state, gripper_pred_state = self.init_model(
+                        image_primary=input_image_primary,
+                        image_wrist=input_image_wrist,
+                        state=input_states,
+                        text_token=input_texts,
+                        action=input_actions,
+                    )
                 label_image_primary = patchify(label_image_primary.flatten(0, 1), patch_size=self.args.patch_size)
                 label_image_wrist = patchify(label_image_wrist.flatten(0, 1), patch_size=self.args.patch_size)
                 # label_image_primary = normalize_patchfied_image(label_image_primary)
