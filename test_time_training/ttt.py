@@ -92,9 +92,15 @@ class RandomSampler():
         for i in range(self.args.ttt_traj_len):
             if i == 0:
                 first_action = torch.zeros(1, self.args.action_sequence_length, 7)
-                action_pred = self.wrapped_model.step_agent(text, state, image_primary, image_wrist, action=first_action) # [B, action_seq, 7]
+                if self.args.eval_action_entropy:
+                    action_pred, _ = self.wrapped_model.step_agent(text, state, image_primary, image_wrist, action=first_action)
+                else:
+                    action_pred = self.wrapped_model.step_agent(text, state, image_primary, image_wrist, action=first_action) # [B, action_seq, 7]
             else:
-                action_pred = self.wrapped_model.step_agent(text, state, image_primary, image_wrist)
+                if self.args.eval_action_entropy:
+                    action_pred, _ = self.wrapped_model.step_agent(text, state, image_primary, image_wrist)
+                else:
+                    action_pred = self.wrapped_model.step_agent(text, state, image_primary, image_wrist)
             _, _, _ = self.wrapped_model.step_world_model(action_pred)
             # action_pred = self.add_noise_to_action(action_pred) # TODO
             sub_actions.append(action_pred)
@@ -154,21 +160,18 @@ class RandomSampler():
             eval_sequences = json.load(f)
             # random.shuffle(eval_sequences)
             initial_state, tasks = eval_sequences[self.test_idx]
-        if not self.args.ttt_use_test_text_instruction:
-            with open(self.lang_path, 'r') as f:
-                tasks = json.load(f)
+        with open(self.lang_path, 'r') as f:
+            tasks = json.load(f)
         conf_dir = Path(self.args.calvin_conf_path)
         val_annotations = OmegaConf.load(conf_dir / "annotations/new_playtable_validation.yaml")
         save_dir = Path(self.args.ttt_data_dir)
         save_dir.mkdir(exist_ok=True)
         traj_idx = 0
-        # self.reset_env(initial_state)
+        self.reset_env(initial_state)
         random.seed(self.args.seed)
         assert self.args.ttt_num_samples <= len(tasks)
-        tasks = random.sample(tasks, self.args.ttt_num_samples)
         for i in tqdm(range(len(tasks)), desc="Sampling"):
             self.reset_env(initial_state)
-            
             subtask = tasks[i]
             traj_idx, _ = self.sample_one_traj(val_annotations, subtask, save_dir, traj_idx)
         print(f"{traj_idx} Traj are Sampled in the Test Time Training Stage for Test {self.test_idx}.")
@@ -532,3 +535,4 @@ def save_video_as_gif(video_tensor, output_path="video.gif", fps=8):
     print(f"GIF saved to {output_path}")
     
     return output_path
+    

@@ -3,8 +3,12 @@ import logging
 import os, json, random
 from pathlib import Path
 import sys
+import time
+import copy
+import copy
 from collections import deque
 from models.model import UniAorld
+# from moviepy.editor import ImageSequenceClip
 from calvin_agent.models.calvin_base_model import CalvinBaseModel
 import time
 from torch.nn.parallel import DistributedDataParallel as DDP
@@ -33,6 +37,8 @@ from calvin_agent.evaluation.utils import (
 )
 from typing import Callable, Any
 from utils.train_utils import get_checkpoint
+
+
 
 os.environ['PYOPENGL_PLATFORM'] = 'egl'
 logger = logging.getLogger(__name__)
@@ -159,9 +165,11 @@ class UniAorldModelWrapper(CalvinBaseModel):
         state = state.unsqueeze(1).to(dtype=self.cast_type)
         state = torch.cat([state[..., :6], state[..., [-1]]], dim=-1)
 
-        image_primary = image_primary.unsqueeze(1).to(dtype=self.cast_type)
+        image_primary = image_primary.unsqueeze(1).to(dtype=self.cast_type) # [B, 1, image_seq_len, ...]
         image_wrist = image_wrist.unsqueeze(1).to(dtype=self.cast_type)
 
+        # print("image_primary", image_primary.shape) torch.Size([1, 1, 3, 3, 224, 224])
+        # print("state", state.shape) # torch.Size([1, 1, 3, 7])
         with torch.no_grad():
             text = text.to(self.device)
             state = state.to(self.device)
@@ -182,6 +190,8 @@ class UniAorldModelWrapper(CalvinBaseModel):
             image_wrist = torch.cat(list(self.gripper_queue), dim=1)
             state = torch.cat(list(self.state_queue), dim=1)
             input_text_token = torch.cat(list(self.text_queue), dim=1)
+            # print("img", image_primary.shape) torch.Size([1, 1, 3, 3, 224, 224])
+            # print("state", state.shape) torch.Size([1, 1, 3, 7])
             action_deque_empty = False
             if len(self.action_queue) == 0:
                 action_deque_empty = True
@@ -191,6 +201,7 @@ class UniAorldModelWrapper(CalvinBaseModel):
             num_step = image_primary.shape[1]
             if num_step < self.history_len:  
                 input_image_primary = torch.cat([image_primary, image_primary[:, -1].unsqueeze(1).repeat(1, self.history_len-num_step, 1, 1, 1, 1)], dim=1)
+                # print(input_image_primary.shape) torch.Size([1, 4, 3, 3, 224, 224])
                 input_image_wrist = torch.cat([image_wrist, image_wrist[:, -1].unsqueeze(1).repeat(1, self.history_len-num_step, 1, 1, 1, 1)], dim=1)
                 input_state = torch.cat([state, state[:, -1].unsqueeze(1).repeat(1, self.history_len-num_step, 1, 1)], dim=1)
             else:
@@ -207,15 +218,17 @@ class UniAorldModelWrapper(CalvinBaseModel):
             num_chunk = self.args.sequence_length
             action_seq_len = input_action.shape[2]
             arm_pred_action, gripper_pred_action, _, _, _ = self.model(
-                    image_primary=input_image_primary.flatten(1, 2),
-                    image_wrist=input_image_wrist.flatten(1, 2),
-                    state=input_state.flatten(1, 2),
-                    text_token=input_text_token,
-                    action=input_action.flatten(1, 2)
-                )
+                image_primary=input_image_primary.flatten(1, 2),
+                image_wrist=input_image_wrist.flatten(1, 2),
+                state=input_state.flatten(1, 2),
+                text_token=input_text_token,
+                action=input_action.flatten(1, 2)
+            )
+            # print("+++++++++++++++++++++++++++")
             if action_deque_empty:
                 self.action_queue = deque(maxlen=self.history_len)
                 action_deque_empty = False
+            # print(arm_pred_action.shape, gripper_pred_action.shape) # torch.Size([1, 2, 5, 6]) torch.Size([1, 2, 5, 1])
             action = torch.concat((arm_pred_action[0, :, :self.args.action_sequence_length, :], gripper_pred_action[0, :, :self.args.action_sequence_length, :] > 0.5), dim=-1)
             action[..., -1] = (action[..., -1] - 0.5) * 2  # scale to -1 or 1
             action = action.view(B, num_chunk, action_seq_len, 7)
@@ -255,12 +268,12 @@ class UniAorldModelWrapper(CalvinBaseModel):
             state_seq_len = input_state.shape[2]
 
             _, _, image_pred, arm_pred_state, gripper_pred_state = self.model(
-                    image_primary=input_image_primary.flatten(1, 2),
-                    image_wrist=input_image_wrist.flatten(1, 2),
-                    state=input_state.flatten(1, 2),
-                    text_token=input_text_token,
-                    action=input_action.flatten(1, 2),
-                )
+                image_primary=input_image_primary.flatten(1, 2),
+                image_wrist=input_image_wrist.flatten(1, 2),
+                state=input_state.flatten(1, 2),
+                text_token=input_text_token,
+                action=input_action.flatten(1, 2),
+            )
             # print(image_pred.shape, arm_pred_state.shape, gripper_pred_state.shape) torch.Size([6, 2, 196, 768]) torch.Size([1, 2, 3, 6]) torch.Size([1, 2, 3, 1])
             # pred_image_primary 6, 196, 768
             state = None
@@ -307,6 +320,7 @@ def evaluate_policy_ddp(model, env, args, epoch, calvin_conf_path, text_process_
     task_cfg = OmegaConf.load(conf_dir / "callbacks/rollout/tasks/new_playtable_tasks.yaml")
     task_oracle = hydra.utils.instantiate(task_cfg)
     cast_dtype = get_cast_dtype(args.precision)
+    # val_annotations = OmegaConf.load(conf_dir / "annotations/new_playtable_validation.yaml")
     if diverse_inst:
         with open('./utils/lang_annotation_cache.json', 'r') as f:
             val_annotations = json.load(f)
@@ -320,6 +334,7 @@ def evaluate_policy_ddp(model, env, args, epoch, calvin_conf_path, text_process_
     device_id = torch.distributed.get_rank()
     assert NUM_SEQUENCES % device_num == 0
     interval_len = int(NUM_SEQUENCES // device_num)
+    import copy
     eval_sequences = eval_sequences[device_id*interval_len:min((device_id+1)*interval_len, NUM_SEQUENCES)]
     results = []
     results_ttt = []
@@ -346,13 +361,21 @@ def evaluate_policy_ddp(model, env, args, epoch, calvin_conf_path, text_process_
         local_sequence_i = 0
         env = make_env(args.calvin_dataset)
         for initial_state, eval_sequence in eval_sequences:
-            result, all_pred_image_primary_list, all_pred_image_wrist_list, all_pred_state_list, all_img_pri_sim, all_img_wrist_sim, \
-                = evaluate_sequence(env, args, model, task_oracle, initial_state, eval_sequence, val_annotations, plans, text_process_fn, image_process_fn, debug, eval_log_dir, base_sequence_i+local_sequence_i, reset=reset, diverse_inst=diverse_inst)
-            # visualize if needed
-            # tensors_to_gif(all_pred_image_primary_list, f'./YOUR_PATH_pred_pri_sim_{n}.gif')
-            # tensors_to_gif(all_img_pri_sim, f'./YOUR_PATH_pri_sim_{n}.gif')
-            # tensors_to_gif(all_pred_image_wrist_list, f'./YOUR_PATH_pred_wrist_sim_{n}.gif')
-            # tensors_to_gif(all_img_wrist_sim, f'./YOUR_PATH_wrist_sim_{n}.gif')
+            # import pybullet as p
+            # print("after make_env pybullet connections:", p.getConnectionInfo())
+            try:
+                result, all_pred_image_primary_list, all_pred_image_wrist_list, all_pred_state_list, all_img_pri_sim, all_img_wrist_sim \
+                    = evaluate_sequence(env, args, model, task_oracle, initial_state, eval_sequence, val_annotations, plans, text_process_fn, image_process_fn, debug, eval_log_dir, base_sequence_i+local_sequence_i, reset=reset, diverse_inst=diverse_inst)
+            finally:    
+                # print("before close pybullet connections:", p.getConnectionInfo())
+                # env.close()
+                # del env
+                pass
+                # print("after close pybullet connections:", p.getConnectionInfo())
+            # tensors_to_gif(all_pred_image_primary_list, f'./pred_pri_sim_{n}.gif')
+            # tensors_to_gif(all_img_pri_sim, f'./pri_sim_{n}.gif')
+            # tensors_to_gif(all_pred_image_wrist_list, f'./pred_wrist_sim_{n}.gif')
+            # tensors_to_gif(all_img_wrist_sim, f'./wrist_sim_{n}.gif')
             n+=1
             results.append(result)
             eval_sequences.set_description(" ".join([f"{i + 1}/5 : {v * 100:.1f}% |" for i, v in enumerate(count_success(results))]))
@@ -373,8 +396,7 @@ def evaluate_policy_ddp(model, env, args, epoch, calvin_conf_path, text_process_
                 res_list = [_[0] for _ in res_tup_list]
                 eval_seq_list = [_[1] for _ in res_tup_list]
                 print_and_save(res_list, eval_seq_list, eval_log_dir, epoch)
-
-
+        
     if args.ttt: 
         p=0
         local_sequence_i = 0
@@ -447,6 +469,7 @@ def evaluate_policy_ddp(model, env, args, epoch, calvin_conf_path, text_process_
                                         lang_path='./utils/all_lang.json',
                                         test_idx=local_sequence_i
                                     )
+                # ttt_model = ttt_trainer.trainer()
                 if not args.ttt_load_model:
                     ttt_model = ttt_trainer.trainer()
                     if args.save_ttt_ckpt:
@@ -491,14 +514,14 @@ def evaluate_policy_ddp(model, env, args, epoch, calvin_conf_path, text_process_
                 ttt_model.model.eval()
             result_ttt, all_pred_image_primary_list_ttt, all_pred_image_wrist_list_ttt, all_pred_state_list_ttt, all_img_pri_sim_ttt, all_img_wrist_sim_ttt \
                 = evaluate_sequence(env, args, ttt_model, task_oracle, initial_state, eval_sequence, val_annotations,  plans, text_process_fn, image_process_fn, debug, eval_log_dir, base_sequence_i+local_sequence_i, reset=reset, diverse_inst=diverse_inst)
-            # visualize if needed
-            # tensors_to_gif(all_pred_image_primary_list_ttt, f'./YOUR_PATH_pred_pri_sim_ttt_{p}.gif')
-            # tensors_to_gif(all_img_pri_sim_ttt, f'./YOUR_PATH_pri_sim_ttt_{p}.gif')
-            # tensors_to_gif(all_pred_image_wrist_list_ttt, f'./YOUR_PATH_pred_wrist_sim_ttt_{p}.gif')
-            # tensors_to_gif(all_img_wrist_sim_ttt, f'./YOUR_PATH_wrist_sim_ttt_{p}.gif')
+            # tensors_to_gif(all_pred_image_primary_list_ttt, f'./pred_pri_sim_{p}_ttt.gif')
+            # tensors_to_gif(all_img_pri_sim_ttt, f'./pri_sim_{p}_ttt.gif')
+            # tensors_to_gif(all_pred_image_wrist_list_ttt, f'./pred_wrist_sim_{p}_ttt.gif')
+            # tensors_to_gif(all_img_wrist_sim_ttt, f'./wrist_sim_{p}_ttt.gif')
             p += 1
             results_ttt.append(result_ttt)
             eval_sequences.set_description(" TTT: " + " ".join([f"{i + 1}/5 : {v * 100:.1f}% |" for i, v in enumerate(count_success(results_ttt))]))
+            # log_metrics_to_file(results, results_ttt, log_file_path=f"evaluation_log_{args.lora_mode}.txt")
             local_sequence_i += 1
             if args.ttt_train_every_test_sample:
                 env.close()
@@ -521,7 +544,6 @@ def evaluate_policy_ddp(model, env, args, epoch, calvin_conf_path, text_process_
                 print_and_save(res_list, eval_seq_list, eval_log_dir, epoch)
         model_name = str(args.lora_rank) + 'rank_' + str(args.lora_alpha) + 'alpha_' + str(args.ttt_num_samples) + "samples_" + str(args.ttt_sample_repeat) + "repeat_" + str(args.ttt_learning_rate) + "lr_" + str(args.ttt_num_epoch) + "epoch_" + str(args.ttt_traj_len) + "traj_len.pth"
         print(f"Finishing lora training {model_name}, but not save")
-        
 
     return results, results_ttt
 
@@ -530,6 +552,7 @@ def evaluate_sequence(env, args, model, task_checker, initial_state, eval_sequen
     Evaluates a sequence of language instructions.
     """
     robot_obs, scene_obs = get_env_state_for_initial_condition(initial_state)
+    # print(robot_obs.shape, scene_obs.shape) (15,) (24,)
     env.reset(robot_obs=robot_obs, scene_obs=scene_obs)
     success_counter = 0
     all_pred_image_primary_list, all_pred_image_wrist_list, all_pred_state_list = [], [], []
@@ -608,9 +631,12 @@ def rollout(env, args, model, task_oracle, subtask, val_annotations, plans,
         pred_state_list.append(pred_state)
 
         image_primary, image_wrist, state, current_info_list = get_robot_info_from_multi_step_env(env, action, image_process_fn)
+        # print(env.get_state_obs()['robot_obs'])
+        # indices = [(j * args.action_sequence_length) // args.image_sequence_length for j in range(args.image_sequence_length)]
         if args.image_sequence_length == 1:
             indices = [args.action_sequence_length - 1]
         else:
+        # indices = [(j * args.action_sequence_length) // args.image_sequence_length for j in range(args.image_sequence_length)]
             indices = torch.linspace(0, args.action_sequence_length-1, steps=args.image_sequence_length) \
                          .round() \
                          .long() \
@@ -634,7 +660,8 @@ def rollout(env, args, model, task_oracle, subtask, val_annotations, plans,
                 return flag, pred_image_primary_list, pred_image_wrist_list, pred_state_list, img_pri_sim, img_wrist_sim
     return flag, pred_image_primary_list, pred_image_wrist_list, pred_state_list, img_pri_sim, img_wrist_sim
 
-def test_calvin(args, model, dataset_path, image_processor, tokenizer, eval_log_dir=None, debug=False, future_act_len=-1, reset=False, diverse_inst=False, ttt=False):
+def test_calvin(args, model, dataloader, dataset_path, image_processor, tokenizer, eval_log_dir=None, debug=False, future_act_len=-1, reset=False, diverse_inst=False, ttt=False):
+    # env = make_env(dataset_path)
     env = None
     device = 'cuda'
     cast_dtype = get_cast_dtype(args.precision)
@@ -691,20 +718,34 @@ def tensors_to_gif(tensor_list, output_path="output.gif", fps=10):
         for i in range(tensor.shape[1]):
             frame = tensor[0, i]
 
+            frame_min_debug = frame.min().item()
+            frame_max_debug = frame.max().item()
+            # print(f"Tensor {tensor_idx}, Frame {i}: Original Min value = {frame_min_debug:.4f}, Max value = {frame_max_debug:.4f}")
+
             # Convert to numpy and transpose from [C, H, W] to [H, W, C]
             frame_np = frame.detach().cpu().numpy().transpose(1, 2, 0)
 
             current_min = np.min(frame_np)
             current_max = np.max(frame_np)
+
+            # 将数据线性缩放到 [0, 1] 范围
+            # 避免除以零的情况，如果max和min相同，则所有像素为0
             if current_max == current_min:
                 normalized_frame_np = np.zeros_like(frame_np)
             else:
                 normalized_frame_np = (frame_np - current_min) / (current_max - current_min)
             
+            # 将 [0, 1] 范围的数据缩放到 [0, 255] 并转换为 uint8
             final_frame_np = (normalized_frame_np * 255).astype(np.uint8)
+            # --- 结束修改后的归一化逻辑 ---
+            
+            # Convert to PIL Image
             frame_pil = Image.fromarray(final_frame_np)
+            
+            # Append to frames list
             frames.append(frame_pil)
-
+    
+    # Create the GIF
     imageio.mimsave(output_path, frames, fps=fps)
     
     print(f"GIF saved to {output_path}")

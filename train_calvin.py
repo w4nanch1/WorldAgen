@@ -51,6 +51,7 @@ def main(args):
     print("training batch size:", ptbs)
     args.run_name = args.run_name.replace("Seer", f"Seer_ptbs{ptbs}_{args.transformer_layers}layers_{args.transformer_heads}heads_hd{args.hidden_dim}")
     print("run_name:", args.run_name)
+    # print('pred_state', args.pred_state)
     model = UniAorld(
         clip_device=device_id,
         vit_checkpoint_path=args.vit_checkpoint_path,
@@ -78,8 +79,7 @@ def main(args):
         calvin_dataset = get_calvin_dataset(args, model.image_processor, clip, epoch=0, except_lang=args.except_lang)
     elif args.finetune_type == "libero_pretrain":
         calvin_dataset = get_libero_pretrain_dataset(args, model.image_processor, clip, epoch=0)
-    else:
-        raise ValueError(f"Invalid finetune type: {args.finetune_type}")
+    # calvin_dataset = get_calvin_test_dataset(args, model.image_processor, clip, epoch=0)
     calvin_loader = calvin_dataset.dataloader
     random_seed(args.seed, args.rank)
     print(f"Start running training on rank {args.rank}.")
@@ -192,6 +192,15 @@ def main(args):
     ckpt_dir = os.path.join(f"{args.save_checkpoint_path}", args.run_name)
     if args.rank == 0 and not os.path.exists(ckpt_dir):
         os.makedirs(ckpt_dir)
+
+    ## accelerete 
+    # if args.precision == "bf16" or args.precision == "amp_bfloat16" or args.precision == "amp_bf16":
+    #     accelerator = Accelerator(mixed_precision='bf16')
+    # else:
+    #     accelerator = Accelerator(mixed_precision='fp16')
+    # model, optimizer,lr_scheduler, calvin_loader = accelerator.prepare(
+    #     model, optimizer,lr_scheduler, calvin_loader)
+
 
     ddp_model.train()
     for epoch in range(resume_from_epoch, args.num_epochs):

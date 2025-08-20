@@ -56,8 +56,11 @@ def main():
         use_qwen=args.use_qwen,
         action_pred_steps=args.action_pred_steps,
     )
+    # calvin_dataset = get_calvin_test_dataset(args, model.image_processor, clip, epoch=0)
+    # calvin_dataset = get_calvin_dataset(args, model.image_processor, clip, epoch=0, except_lang=args.except_lang)
+
     random_seed(args.seed, args.rank)
-    print(f"Start running evaluation on rank {args.rank}.")
+    print(f"Start running training on rank {args.rank}.")
     if args.rank == 0 and args.report_to_wandb:
         wandb.init(
             project=args.wandb_project,
@@ -97,6 +100,7 @@ def main():
         test_calvin( 
             args=args,
             model=ddp_model,
+            dataloader=None,
             image_processor=model.image_processor,
             tokenizer=clip,
             dataset_path=args.calvin_dataset,

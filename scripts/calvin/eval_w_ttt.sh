@@ -1,9 +1,10 @@
 #!/bin/bash
-win=16          # trajectory length
+### 训练时，只训练一次  reset
+win=16          # window size
 img=1           # image sequence length
 act=5           # action sequence length
 
-lora_mode="lora" 
+lora_mode="lora"
 lora_rank=128
 lora_alpha=32
 lora_dropout=0.0
@@ -23,7 +24,6 @@ calvin_dataset_path="calvin/dataset/task_ABC_D/"
 calvin_conf_path="calvin/calvin_models/conf"
 vit_checkpoint_path="checkpoints/vit_mae/mae_pretrain_vit_base.pth"
 save_checkpoint_path="checkpoints/"
-ttt_data_dir="./YOUR_DATA_DIR/"
 
 window_size=$win
 image_sequence_length=$img
@@ -38,6 +38,28 @@ base_checkpoint_dir="checkpoints/$experiment_name"
 node=1
 node_num=1
 
+echo "========================================="
+echo "Configuration:"
+echo "Experiment name: $experiment_name"
+echo "Window size: $window_size"
+echo "Image sequence length: $image_sequence_length"
+echo "State sequence length: $state_sequence_length"
+echo "Action sequence length: $action_sequence_length"
+echo "Sequence length: $sequence_length"
+echo "Checkpoint directory: $base_checkpoint_dir"
+echo "lora_mode: $lora_mode"
+echo "lora_rank: $lora_rank" 
+echo "lora_alpha: $lora_alpha"
+echo "lora_dropout: $lora_dropout"
+echo "ttt_num_samples: $ttt_num_samples"
+echo "ttt_traj_len: $ttt_traj_len"
+echo "ttt_sample_repeat: $ttt_sample_repeat"
+echo "ttt_batch_size: $ttt_batch_size"
+echo "ttt_num_epoch: $ttt_num_epoch"
+echo "ttt_learning_rate: $ttt_learning_rate"
+echo "ttt_weight_decay: $ttt_weight_decay"
+echo "========================================="
+
 for ckpt_name in "${ckpt_names[@]}"; do
     resume_from_checkpoint="${base_checkpoint_dir}/${ckpt_name}.pth"
     
@@ -45,7 +67,7 @@ for ckpt_name in "${ckpt_names[@]}"; do
     mkdir -p "$log_folder"
     log_file="eval_logs/$log_name/evaluate_${ckpt_name}.pth.log"
 
-    torchrun --nnodes=${node} --nproc_per_node=${node_num} --master_port=10075 eval_calvin.py \
+    torchrun --nnodes=${node} --nproc_per_node=${node_num} --master_port=10015 eval_calvin.py \
         --traj_cons \
         --rgb_pad -1 \
         --gripper_pad -1 \
@@ -92,10 +114,13 @@ for ckpt_name in "${ckpt_names[@]}"; do
         --ttt_learning_rate ${ttt_learning_rate} \
         --ttt_weight_decay ${ttt_weight_decay} \
         --ttt_max_grad_norm 0.1 \
-        --ttt_data_dir ${ttt_data_dir} \
+        --ttt_data_dir "./data_for_one_traj/" \
         --lora_mode ${lora_mode} \
         --lora_rank ${lora_rank} \
         --lora_alpha ${lora_alpha} \
         --lora_dropout ${lora_dropout} \
         --resume_from_checkpoint ${resume_from_checkpoint} | tee ${log_file}
+        # --save_ttt_ckpt \
+        # --ttt_load_model \
+        # --ttt_load_model_path /root/UniAorld/checkpoints/lora/128rank_32alpha_1samples_6repeat_0.0005lr_1epoch.pth \
 done
