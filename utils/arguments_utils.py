@@ -75,7 +75,7 @@ def get_parser(is_eval=False):
     parser.add_argument(
         "--droid_dataset",
         type=str,
-        default='/datasets/droid_100',
+        default='datasets/droid_100',
         help="path to droid_dataset",
     )
     parser.add_argument("--warmup_epochs", default=1, type=int)
@@ -227,7 +227,7 @@ def get_parser(is_eval=False):
     # pretrain, finetune, evaluate
     parser.add_argument('--phase', required=True, help='pretrain, finetune, evaluate')
     # libero 
-    parser.add_argument("--libero_path", default="/ailab/user/tianyang/Code/LIBERO")
+    parser.add_argument("--libero_path", default="LIBERO")
     parser.add_argument("--libero_img_size", default=128, type=int)
     parser.add_argument("--libero_eval_max_steps", default=600, type=int)
     parser.add_argument("--gripper_width", default=False, action="store_true")
@@ -252,7 +252,7 @@ def get_parser(is_eval=False):
     parser.add_argument(
         "--calvin_dataset",
         type=str,
-        default='/mnt/petrelfs/share_data/robomani/calvin_data/task_ABCD_D',
+        default='calvin/dataset/task_ABC_D',
         help="path to calvin_dataset",
     )
     parser.add_argument("--calvin_conf_path", type=str, help="path to droid configuration file")

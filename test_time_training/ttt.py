@@ -468,21 +468,21 @@ def unpatchify(x, patch_size):
         h = w = int(math.sqrt(x.shape[2]))
         assert h * w == x.shape[2]
         
-        # 重塑为 (B, N, h, w, patch_size, patch_size, 3)
+        # Reshape to (B, N, h, w, patch_size, patch_size, 3).
         x = x.reshape(shape=(x.shape[0], x.shape[1], h, w, patch_size, patch_size, 3))
-        # 调整维度顺序
+        # Reorder the dimensions.
         x = torch.einsum('bnhwpqc->bnchpwq', x)
-        # 最后重塑为 (B, N, 3, H, W)
+        # Finally reshape to (B, N, 3, H, W).
         imgs = x.reshape(shape=(x.shape[0], x.shape[1], 3, h * patch_size, w * patch_size))
     else:  # (N, L, patch_size**2 * 3)
         h = w = int(math.sqrt(x.shape[1]))
         assert h * w == x.shape[1]
         
-        # 重塑为 (N, h, w, patch_size, patch_size, 3)
+        # Reshape to (N, h, w, patch_size, patch_size, 3).
         x = x.reshape(shape=(x.shape[0], h, w, patch_size, patch_size, 3))
-        # 调整维度顺序
+        # Reorder the dimensions.
         x = torch.einsum('nhwpqc->nchpwq', x)
-        # 最后重塑为 (N, 3, H, W)
+        # Finally reshape to (N, 3, H, W).
         imgs = x.reshape(shape=(x.shape[0], 3, h * patch_size, w * patch_size))
     
     return imgs

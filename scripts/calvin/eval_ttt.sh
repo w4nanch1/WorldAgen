@@ -1,5 +1,4 @@
 #!/bin/bash
-### 训练时，只训练一次  reset
 win=16          # window size
 img=1           # image sequence length
 act=5           # action sequence length
@@ -120,7 +119,4 @@ for ckpt_name in "${ckpt_names[@]}"; do
         --lora_alpha ${lora_alpha} \
         --lora_dropout ${lora_dropout} \
         --resume_from_checkpoint ${resume_from_checkpoint} | tee ${log_file}
-        # --save_ttt_ckpt \
-        # --ttt_load_model \
-        # --ttt_load_model_path /root/UniAorld/checkpoints/lora/128rank_32alpha_1samples_6repeat_0.0005lr_1epoch.pth \
 done

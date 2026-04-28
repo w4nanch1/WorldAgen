@@ -18,6 +18,8 @@ import math
 ### Rotation ###
 from scipy.spatial.transform import Rotation
 
+REPO_ROOT = Path(__file__).resolve().parent
+
 
 def setup(rank, world_size, port):
     os.environ["MASTER_ADDR"] = "localhost"
@@ -218,8 +220,8 @@ class DatasetConverter:
                 episode_idx += 1
                 total_step += num_steps
         # print(total_step)
-        # 确保 data_info 目录存在
-        data_info_dir = Path('/workspace/root/uniaorld/scripts/LIBERO_LONG/Seer/data_info')
+        # Ensure the repo-local data_info directory exists.
+        data_info_dir = REPO_ROOT / 'data_info'
         data_info_dir.mkdir(exist_ok=True)
         
         with open(data_info_dir / f'{dataset_name}_converted.json', 'w') as f:
@@ -231,10 +233,9 @@ def main(rank, port, num_worker, start_episode_idx=0, end_episode_idx=None):
 
     global dataset_name
     dataset_name = "libero_90" # 
-    # 修改为实际的数据集路径
-    src_dir = f"/workspace/root/uniaorld/datasets/{dataset_name}"
-    tgt_dir = Path(f"/workspace/root/uniaorld/datasets/{dataset_name}_converted")
-    tgt_dir.mkdir(exist_ok=True)  # 使用 parents=True 递归创建目录
+    src_dir = REPO_ROOT / "datasets" / dataset_name
+    tgt_dir = REPO_ROOT / "datasets" / f"{dataset_name}_converted"
+    tgt_dir.mkdir(exist_ok=True)
 
     dataset_converter = DatasetConverter(
         src_dir=src_dir,

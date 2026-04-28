@@ -729,16 +729,15 @@ def tensors_to_gif(tensor_list, output_path="output.gif", fps=10):
             current_min = np.min(frame_np)
             current_max = np.max(frame_np)
 
-            # 将数据线性缩放到 [0, 1] 范围
-            # 避免除以零的情况，如果max和min相同，则所有像素为0
+            # Linearly scale the data into the [0, 1] range.
+            # Avoid division by zero; if max equals min, set all pixels to 0.
             if current_max == current_min:
                 normalized_frame_np = np.zeros_like(frame_np)
             else:
                 normalized_frame_np = (frame_np - current_min) / (current_max - current_min)
             
-            # 将 [0, 1] 范围的数据缩放到 [0, 255] 并转换为 uint8
+            # Scale the [0, 1] data to [0, 255] and convert to uint8.
             final_frame_np = (normalized_frame_np * 255).astype(np.uint8)
-            # --- 结束修改后的归一化逻辑 ---
             
             # Convert to PIL Image
             frame_pil = Image.fromarray(final_frame_np)

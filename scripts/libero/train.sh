@@ -1,6 +1,6 @@
 #!/bin/bash
 export CUDA_HOME="/usr/local/cuda"
-save_dir="./YOUR_CHECKPOINT_SAVE_DIR/"
+save_dir="./checkpoints/"
 root_dir="./YOUR_DATASET_DIR/"
 vit_checkpoint_path="./checkpoints/mae_pretrain_vit_base.pth"
 libero_path="./YOUR_DATASET_DIR/libero_90"

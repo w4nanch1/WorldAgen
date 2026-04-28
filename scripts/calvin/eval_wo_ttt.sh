@@ -8,7 +8,7 @@ ckpt_names=(
     "16"
 )
 
-calvin_dataset_path="/home/chiwan/project/UniAorld/calvin/dataset/task_ABC_D"
+calvin_dataset_path="calvin/dataset/task_ABC_D"
 calvin_conf_path="calvin/calvin_models/conf"
 vit_checkpoint_path="checkpoints/vit_mae/mae_pretrain_vit_base.pth"
 save_checkpoint_path="checkpoints/"
@@ -82,7 +82,5 @@ for ckpt_name in "${ckpt_names[@]}"; do
         --use_qwen \
         --eval_action_entropy \
         --resume_from_checkpoint ${resume_from_checkpoint} | tee ${log_file} \
-    # --pred_image \
-    # --eval_action_entropy \
 done
     
