@@ -86,7 +86,7 @@ You will usually need to modify the following in `scripts/calvin/train.sh`:
 
 ### Evaluation
 
-You can also download our pretrained [checkpoint](https://drive.google.com/file/d/1zubo1ckdc9Qlbnq4iNf9AD8V1oW8Z7Om/view?usp=sharing) and place it to the `checkpoints/scratch_qwen_16win_1img_5act` to run evaluation.
+You can also download our pretrained [checkpoint](https://drive.google.com/file/d/1zubo1ckdc9Qlbnq4iNf9AD8V1oW8Z7Om/view?usp=share_link) and place it to the `checkpoints/scratch_qwen_16win_1img_5act` to run evaluation.
 
 ### Eval without Test Time Training
 ```bash

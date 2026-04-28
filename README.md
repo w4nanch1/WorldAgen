@@ -34,14 +34,14 @@ We provide step-by-step guides to set up and run **WorldAgen** on two popular si
 
 ### 🔹 CALVIN
 
-| Method             | Task 1 | Task 2 | Task 3 | Task 4 | Task 5 | Mean (%) |
+| Method             | Task 1 | Task 2 | Task 3 | Task 4 | Task 5 | Mean Successful Rate (%) |
 |--------------------|--------|--------|--------|--------|--------|----------|
-| **WorldAgen**      | 96.3   | 87.7   | 76.8   | 67.3   | 59.1   | 3.87     |
-| **WorldAgen-TTT**  | **96.6** | **88.5** | **78.5** | **68.7** | **60.5** | **3.93** |
+| **WorldAgen**      | 96.3   | 87.7   | 76.8   | 67.3   | 59.1   | 77.4     |
+| **WorldAgen-TTT**  | **96.6** | **88.5** | **78.5** | **68.7** | **60.5** | **78.6** |
 ---
 ### 🔹 LIBERO-10
 
-| Method             | Success Rate (%) |
+| Method             | Mean Success Rate (%) |
 |--------------------|-----------------|
 | **WorldAgen**      | 75.5            |
 | **WorldAgen-TTT**  | **79.0**        |
@@ -65,6 +65,27 @@ Below, we present a qualitative comparison of **WorldAgen** before and after app
   </tr>
 </table>
 
+
+## License <a name="license"></a>
+
+All assets and code are under the [Apache 2.0 license](./LICENSE) unless specified otherwise.
+
+
+## 📚 Citation
+
+If you find **WorldAgen** useful in your research, please cite our work:
+
+```bibtex
+@inproceedings{wan2026worldagen,
+  title={Worldagen: Unified state-action prediction with test-time world model training},
+  author={Wan, Chi and Wang, Kangrui and Si, Yuan and Zhang, Pingyue and Li, Manling},
+  booktitle={Proceedings of the AAAI Conference on Artificial Intelligence},
+  volume={40},
+  number={22},
+  pages={18584--18592},
+  year={2026}
+}
+```
 
 ## Acknowledgment <a name="acknowledgment"></a>
 This project builds upon [Seer](https://github.com/InternRobotics/Seer/tree/main). We thank them for their open-source contributions.

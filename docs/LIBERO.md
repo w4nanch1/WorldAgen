@@ -71,7 +71,7 @@ You will usually need to modify the following in `scripts/libero/train.sh`:
 
 ### Evaluation
 
-You can also download our pretrained [checkpoint]() and place it to the `checkpoints/libero_traj7_len_1img_3act` to run evaluation. 
+You can also download our pretrained [checkpoint](https://drive.google.com/file/d/1IKRilL57qm52NEcHcLEL_ZFb2ak4sUMQ/view?usp=share_link) and place it to the `checkpoints/libero_traj7_len_1img_3act` to run evaluation. 
 
 ### Eval without Test Time Training
 
