@@ -54,6 +54,11 @@ The following variables should be updated to match your local paths and experime
 
 ## 🤖 Run WorldAgen
 
+### Convert Data
+```bash
+python utils/convert_libero_per_step.py
+```
+
 ### Train
 
 ```bash
